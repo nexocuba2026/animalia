@@ -28,7 +28,7 @@ export default function HistorialPage() {
   const [loading, setLoading] = useState(true)
   const [nuevaDescripcion, setNuevaDescripcion] = useState('')
   const [nuevoTipo, setNuevoTipo] = useState('consulta')
-  const [message, setMessage] = useState('')
+  
   const [estadoSeleccionado, setEstadoSeleccionado] = useState<string>('activa')
 
   useEffect(() => {

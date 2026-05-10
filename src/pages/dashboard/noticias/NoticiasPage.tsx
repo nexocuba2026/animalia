@@ -47,7 +47,6 @@ export default function NoticiasPage() {
     else {
       setMensaje('Noticia guardada.')
       setEditando(null)
-      // Recargar lista
       const { data } = await supabase.from('noticias').select('*').order('created_at', { ascending: false })
       if (data) setNoticias(data)
     }
@@ -107,7 +106,7 @@ export default function NoticiasPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <form onSubmit={guardarNoticia} className="bg-white rounded-2xl p-6 w-full max-w-lg space-y-4">
             <h2 className="text-lg font-bold">{editando.id ? 'Editar' : 'Nueva'} Noticia</h2>
-            <input type="text" placeholder="Título" value={editando.titulo} onChange={(e) => setEditando({...editando, titolo: e.target.value})} className="w-full border rounded-xl px-4 py-2" required />
+            <input type="text" placeholder="Título" value={editando.titulo} onChange={(e) => setEditando({...editando, titulo: e.target.value})} className="w-full border rounded-xl px-4 py-2" required />
             <textarea placeholder="Contenido" value={editando.contenido} onChange={(e) => setEditando({...editando, contenido: e.target.value})} className="w-full border rounded-xl px-4 py-2" rows={5} />
             <input type="text" placeholder="URL imagen (opcional)" value={editando.imagen_url} onChange={(e) => setEditando({...editando, imagen_url: e.target.value})} className="w-full border rounded-xl px-4 py-2" />
             <label className="flex items-center gap-2">
