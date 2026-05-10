@@ -29,23 +29,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const initSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        await fetchProfile(session.user.id)
+    const fetchProfile = async (userId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single()
+        if (error) {
+          console.error('Error al cargar perfil:', error.message)
+          // No bloqueamos la UI
+        } else if (data) {
+          setProfile(data as Profile)
+        }
+      } catch (err) {
+        console.error('Excepción al cargar perfil:', err)
       }
-      setLoading(false)
     }
 
-    const fetchProfile = async (userId: string) => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-      if (data) setProfile(data as Profile)
+    const initSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        setSession(session)
+        setUser(session?.user ?? null)
+        if (session?.user) {
+          await fetchProfile(session.user.id)
+        }
+      } catch (err) {
+        console.error('Error al obtener sesión:', err)
+      } finally {
+        // Siempre termina la carga, haya error o no
+        setLoading(false)
+      }
     }
 
     initSession()
