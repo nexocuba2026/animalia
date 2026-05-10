@@ -7,7 +7,7 @@ export default function HomePage() {
       <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-black/70"></div>
       <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
         <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-8">
-          <span className="text-5xl">🐾</span>
+         <img src="/logo.png" alt="ANIMALIA" className="w-24 h-24 object-contain" />
         </div>
         <h1 className="text-5xl md:text-7xl font-extrabold text-white mb-4 tracking-tight">ANIMALIA</h1>
         <p className="text-lg md:text-2xl text-white/80 mb-12 max-w-2xl mx-auto leading-relaxed">
