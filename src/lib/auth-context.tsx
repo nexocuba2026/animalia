@@ -29,6 +29,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    console.log('AuthProvider: iniciando carga de sesión')
+
     const fetchProfile = async (userId: string) => {
       try {
         const { data, error } = await supabase
@@ -38,9 +40,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single()
         if (error) {
           console.error('Error al cargar perfil:', error.message)
-          // No bloqueamos la UI
         } else if (data) {
           setProfile(data as Profile)
+          console.log('AuthProvider: perfil cargado:', data)
         }
       } catch (err) {
         console.error('Excepción al cargar perfil:', err)
@@ -58,8 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         console.error('Error al obtener sesión:', err)
       } finally {
-        // Siempre termina la carga, haya error o no
         setLoading(false)
+        console.log('AuthProvider: carga finalizada')
       }
     }
 
