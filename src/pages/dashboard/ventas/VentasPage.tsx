@@ -7,7 +7,7 @@ import 'jspdf-autotable'
 type Venta = {
   id: string
   fecha_pedido: string
-  tipo_entrega: string          // <-- añadido
+  tipo_entrega: string
   items: { cantidad: number; precio_unitario: number; producto: { nombre: string } }[]
   subtotal: number
   costoEnvio: number
@@ -30,7 +30,7 @@ export default function VentasPage() {
   const fetchVentas = async () => {
     const { data } = await supabase
       .from('pedidos')
-      .select('id, fecha_pedido, tipo_entrega, items:pedido_items(cantidad, precio_unitario, producto:productos(nombre))')  // <-- tipo_entrega incluido
+      .select('id, fecha_pedido, tipo_entrega, items:pedido_items(cantidad, precio_unitario, producto:productos(nombre))')
       .eq('estado', 'entregado')
       .order('fecha_pedido', { ascending: false })
 
@@ -50,6 +50,7 @@ export default function VentasPage() {
     setLoading(false)
   }
 
+  // Filtro en pantalla
   const ventasFiltradas = ventas.filter((v) => {
     const desdeOk = !fechaDesde || new Date(v.fecha_pedido) >= new Date(fechaDesde)
     const hastaOk = !fechaHasta || new Date(v.fecha_pedido) <= new Date(fechaHasta + 'T23:59:59')
@@ -59,15 +60,17 @@ export default function VentasPage() {
     return desdeOk && hastaOk && productoOk
   })
 
+  // Exportar PDF
   const exportarPDF = () => {
     const doc = new jsPDF()
     doc.setFontSize(14)
     doc.text('REGISTRO DE VENTAS - ANIMALIA', 14, 20)
     doc.setFontSize(10)
-    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 28)
+    doc.text(`Fecha: ${new Date().toLocaleDateString('es-CU')}`, 14, 28)
 
-    const rows = ventasFiltradas.map((v) => [
-      new Date(v.fecha_pedido).toLocaleDateString(),
+    const rows = ventasFiltradas.map((v, index) => [
+      (index + 1).toString().padStart(3, '0'),  // Nº de pedido secuencial
+      new Date(v.fecha_pedido).toLocaleDateString('es-CU'),
       v.items.map((item) => `${item.producto?.nombre} (x${item.cantidad})`).join(', '),
       v.items.reduce((sum, item) => sum + item.cantidad, 0),
       `$${v.subtotal.toFixed(2)}`,
@@ -77,10 +80,14 @@ export default function VentasPage() {
 
     ;(doc as any).autoTable({
       startY: 35,
-      head: [['Fecha', 'Productos', 'Cantidad', 'Subtotal', 'Envío', 'Total']],
+      head: [['Nº', 'Fecha', 'Productos', 'Cantidad', 'Subtotal', 'Envío', 'Total']],
       body: rows,
       theme: 'grid',
       headStyles: { fillColor: [255, 152, 0], textColor: [255, 255, 255] },
+      bodyStyles: {},
+      columnStyles: {
+        5: { textColor: [220, 38, 38] }, // Envío en rojo
+      },
     })
 
     doc.save('ventas-animalia.pdf')
@@ -122,6 +129,7 @@ export default function VentasPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr>
+              <th className="p-3 text-left">Nº</th>
               <th className="p-3 text-left">Fecha</th>
               <th className="p-3 text-left">Productos</th>
               <th className="p-3 text-left">Cantidad</th>
@@ -132,11 +140,12 @@ export default function VentasPage() {
           </thead>
           <tbody>
             {ventasFiltradas.length === 0 ? (
-              <tr><td colSpan={6} className="p-4 text-center text-gray-500">No hay ventas registradas.</td></tr>
+              <tr><td colSpan={7} className="p-4 text-center text-gray-500">No hay ventas registradas.</td></tr>
             ) : (
-              ventasFiltradas.map((v) => (
+              ventasFiltradas.map((v, index) => (
                 <tr key={v.id} className="border-t hover:bg-gray-50">
-                  <td className="p-3">{new Date(v.fecha_pedido).toLocaleDateString()}</td>
+                  <td className="p-3">{(index + 1).toString().padStart(3, '0')}</td>
+                  <td className="p-3">{new Date(v.fecha_pedido).toLocaleDateString('es-CU')}</td>
                   <td className="p-3">
                     {v.items.map((item, i) => (
                       <div key={i}>{item.producto?.nombre} x{item.cantidad}</div>
@@ -144,8 +153,10 @@ export default function VentasPage() {
                   </td>
                   <td className="p-3">{v.items.reduce((sum, item) => sum + item.cantidad, 0)}</td>
                   <td className="p-3">${v.subtotal.toFixed(2)}</td>
-                  <td className="p-3">{v.tipo_entrega === 'domicilio' ? `$${v.costoEnvio.toFixed(2)}` : 'GRATIS'}</td>
-                  <td className="p-3 font-medium">${v.total.toFixed(2)}</td>
+                  <td className={`p-3 font-medium ${v.tipo_entrega === 'domicilio' ? 'text-red-600' : 'text-gray-600'}`}>
+                    {v.tipo_entrega === 'domicilio' ? `$${v.costoEnvio.toFixed(2)}` : 'GRATIS'}
+                  </td>
+                  <td className="p-3 font-semibold">${v.total.toFixed(2)}</td>
                 </tr>
               ))
             )}
