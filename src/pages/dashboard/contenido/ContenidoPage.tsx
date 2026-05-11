@@ -5,13 +5,18 @@ import { useAuth } from '../../../lib/auth-context'
 export default function ContenidoPage() {
   const { profile } = useAuth()
   const [seccion, setSeccion] = useState('inicio')
-  const [contenido, setContenido] = useState('')
+  const [titulo, setTitulo] = useState('')
+  const [texto, setTexto] = useState('')
+  const [items, setItems] = useState<string[]>([])
+  const [faqItems, setFaqItems] = useState<{ pregunta: string; respuesta: string }[]>([])
   const [mensaje, setMensaje] = useState('')
   const [loading, setLoading] = useState(true)
 
+  // Cargar datos de la sección seleccionada
   useEffect(() => {
     if (!profile || !['administrador', 'superadmin'].includes(profile.role)) return
 
+    setLoading(true)
     supabase
       .from('contenido_web')
       .select('*')
@@ -19,34 +24,79 @@ export default function ContenidoPage() {
       .single()
       .then(({ data }) => {
         if (data) {
-          setContenido(JSON.stringify(data.contenido, null, 2))
+          const contenido = data.contenido
+          setTitulo(contenido.titulo || '')
+          setTexto(contenido.texto || '')
+          if (seccion === 'faq') {
+            // FAQ usa array de {pregunta, respuesta}
+            setFaqItems(contenido.items || [])
+            setItems([])
+          } else {
+            setItems(contenido.items || [])
+            setFaqItems([])
+          }
         } else {
-          setContenido(JSON.stringify({ titulo: '', texto: '', items: [] }, null, 2))
+          // Valores por defecto
+          setTitulo('')
+          setTexto('')
+          setItems([])
+          setFaqItems([])
         }
         setLoading(false)
       })
   }, [seccion, profile])
 
+  // Guardar cambios
   const handleGuardar = async () => {
-    try {
-      const json = JSON.parse(contenido)
-      const { data: existente } = await supabase
-        .from('contenido_web')
-        .select('id')
-        .eq('seccion', seccion)
-        .single()
-
-      if (existente) {
-        await supabase.from('contenido_web').update({ contenido: json }).eq('id', existente.id)
-      } else {
-        await supabase.from('contenido_web').insert({ seccion, contenido: json })
-      }
-      setMensaje('✅ Contenido guardado correctamente.')
-    } catch {
-      setMensaje('❌ Error: el contenido no es un JSON válido.')
+    const contenido: any = { titulo, texto }
+    if (seccion === 'faq') {
+      contenido.items = faqItems
+    } else {
+      contenido.items = items
     }
 
+    const { data: existente } = await supabase
+      .from('contenido_web')
+      .select('id')
+      .eq('seccion', seccion)
+      .single()
+
+    const { error } = existente
+      ? await supabase.from('contenido_web').update({ contenido }).eq('id', existente.id)
+      : await supabase.from('contenido_web').insert({ seccion, contenido })
+
+    if (error) {
+      setMensaje('Error al guardar: ' + error.message)
+    } else {
+      setMensaje('✅ Contenido guardado correctamente.')
+    }
     setTimeout(() => setMensaje(''), 3000)
+  }
+
+  // Funciones para manejar items de Servicios
+  const agregarItem = () => {
+    setItems([...items, ''])
+  }
+  const actualizarItem = (index: number, valor: string) => {
+    const nuevos = [...items]
+    nuevos[index] = valor
+    setItems(nuevos)
+  }
+  const eliminarItem = (index: number) => {
+    setItems(items.filter((_, i) => i !== index))
+  }
+
+  // Funciones para manejar preguntas frecuentes
+  const agregarPregunta = () => {
+    setFaqItems([...faqItems, { pregunta: '', respuesta: '' }])
+  }
+  const actualizarPregunta = (index: number, campo: string, valor: string) => {
+    const nuevos = [...faqItems]
+    nuevos[index] = { ...nuevos[index], [campo]: valor }
+    setFaqItems(nuevos)
+  }
+  const eliminarPregunta = (index: number) => {
+    setFaqItems(faqItems.filter((_, i) => i !== index))
   }
 
   if (!profile || !['administrador', 'superadmin'].includes(profile.role))
@@ -66,53 +116,105 @@ export default function ContenidoPage() {
               seccion === s ? 'bg-orange-500 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
             }`}
           >
-            {s.charAt(0).toUpperCase() + s.slice(1)}
+            {s === 'inicio' ? 'Inicio' : s === 'servicios' ? 'Servicios' : 'Preguntas Frecuentes'}
           </button>
         ))}
       </div>
 
-      {/* Editor de texto */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-6">
-        {loading ? (
-          <p className="text-gray-500">Cargando contenido...</p>
-        ) : (
-          <>
-            <textarea
-              value={contenido}
-              onChange={(e) => setContenido(e.target.value)}
-              rows={16}
-              className="w-full border rounded-xl p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-              placeholder='{"titulo": "", "texto": "", "items": []}'
+      {loading ? (
+        <p className="text-gray-500">Cargando contenido...</p>
+      ) : (
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 space-y-6">
+          {/* Campos comunes: Título y Texto */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Título</label>
+            <input
+              type="text"
+              value={titulo}
+              onChange={(e) => setTitulo(e.target.value)}
+              className="w-full border rounded-xl px-4 py-2"
+              placeholder="Título de la sección"
             />
-            <div className="mt-4 flex items-center gap-4">
-              <button
-                onClick={handleGuardar}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-2 rounded-xl transition"
-              >
-                Guardar cambios
-              </button>
-              {mensaje && (
-                <span className={`text-sm ${mensaje.startsWith('✅') ? 'text-green-600' : 'text-red-600'}`}>
-                  {mensaje}
-                </span>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Texto principal</label>
+            <textarea
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              className="w-full border rounded-xl px-4 py-2"
+              rows={3}
+              placeholder="Texto descriptivo"
+            />
+          </div>
 
-      {/* Ayuda de ejemplo */}
-      <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-sm text-gray-600">
-        <p className="font-semibold mb-2">Ejemplos de formato JSON:</p>
-        <pre className="whitespace-pre-wrap">
-{`{
-  "titulo": "Bienvenidos a ANIMALIA",
-  "texto": "Centro Veterinario Universitario de Cienfuegos",
-  "items": []
-}`}
-        </pre>
-        <p className="mt-2">Para Servicios o FAQ, añade el arreglo <strong>"items": ["Servicio 1", "Servicio 2"]</strong></p>
-      </div>
+          {/* Sección específica para Servicios */}
+          {seccion === 'servicios' && (
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium text-gray-700">Lista de servicios</label>
+                <button onClick={agregarItem} className="text-orange-600 text-sm hover:underline">+ Añadir servicio</button>
+              </div>
+              {items.map((item, index) => (
+                <div key={index} className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={item}
+                    onChange={(e) => actualizarItem(index, e.target.value)}
+                    className="flex-1 border rounded-xl px-4 py-2"
+                    placeholder={`Servicio ${index + 1}`}
+                  />
+                  <button onClick={() => eliminarItem(index)} className="text-red-600 hover:underline">🗑️</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Sección específica para FAQ */}
+          {seccion === 'faq' && (
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-sm font-medium text-gray-700">Preguntas y respuestas</label>
+                <button onClick={agregarPregunta} className="text-orange-600 text-sm hover:underline">+ Añadir pregunta</button>
+              </div>
+              {faqItems.map((item, index) => (
+                <div key={index} className="border rounded-xl p-4 mb-4 space-y-3">
+                  <div>
+                    <label className="text-xs text-gray-500">Pregunta</label>
+                    <input
+                      type="text"
+                      value={item.pregunta}
+                      onChange={(e) => actualizarPregunta(index, 'pregunta', e.target.value)}
+                      className="w-full border rounded-xl px-4 py-2"
+                      placeholder="Escribe la pregunta"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500">Respuesta</label>
+                    <textarea
+                      value={item.respuesta}
+                      onChange={(e) => actualizarPregunta(index, 'respuesta', e.target.value)}
+                      className="w-full border rounded-xl px-4 py-2"
+                      rows={2}
+                      placeholder="Escribe la respuesta"
+                    />
+                  </div>
+                  <button onClick={() => eliminarPregunta(index)} className="text-red-600 text-sm hover:underline">Eliminar pregunta</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={handleGuardar}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-xl transition"
+          >
+            Guardar cambios
+          </button>
+          {mensaje && (
+            <p className={`text-sm ${mensaje.startsWith('✅') ? 'text-green-600' : 'text-red-600'}`}>{mensaje}</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }
