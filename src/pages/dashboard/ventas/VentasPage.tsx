@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../lib/auth-context'
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
 
 type Venta = {
   id: string
   fecha_pedido: string
-  estado: string
-  tipo_entrega: string
   items: { cantidad: number; precio_unitario: number; producto: { nombre: string } }[]
+  subtotal: number
+  costoEnvio: number
   total: number
 }
 
@@ -27,16 +29,22 @@ export default function VentasPage() {
   const fetchVentas = async () => {
     const { data } = await supabase
       .from('pedidos')
-      .select('id, fecha_pedido, estado, tipo_entrega, items:pedido_items(cantidad, precio_unitario, producto:productos(nombre))')
+      .select('id, fecha_pedido, tipo_entrega, items:pedido_items(cantidad, precio_unitario, producto:productos(nombre))')
       .eq('estado', 'entregado')
       .order('fecha_pedido', { ascending: false })
 
     if (data) {
-      const ventasConTotal = data.map((pedido: any) => ({
-        ...pedido,
-        total: pedido.items.reduce((sum: number, item: any) => sum + item.cantidad * item.precio_unitario, 0),
-      }))
-      setVentas(ventasConTotal)
+      const ventasConTotales = data.map((pedido: any) => {
+        const subtotal = pedido.items.reduce((sum: number, item: any) => sum + item.cantidad * item.precio_unitario, 0)
+        const costoEnvio = pedido.tipo_entrega === 'domicilio' ? 5.0 : 0
+        return {
+          ...pedido,
+          subtotal,
+          costoEnvio,
+          total: subtotal + costoEnvio,
+        }
+      })
+      setVentas(ventasConTotales)
     }
     setLoading(false)
   }
@@ -50,8 +58,31 @@ export default function VentasPage() {
     return desdeOk && hastaOk && productoOk
   })
 
-  const exportarPDF = async () => {
-    alert('Funcionalidad de exportación PDF en desarrollo. Por ahora, puedes ver los datos en pantalla.')
+  const exportarPDF = () => {
+    const doc = new jsPDF()
+    doc.setFontSize(14)
+    doc.text('REGISTRO DE VENTAS - ANIMALIA', 14, 20)
+    doc.setFontSize(10)
+    doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 14, 28)
+
+    const rows = ventasFiltradas.map((v) => [
+      new Date(v.fecha_pedido).toLocaleDateString(),
+      v.items.map((item) => `${item.producto?.nombre} (x${item.cantidad})`).join(', '),
+      v.items.reduce((sum, item) => sum + item.cantidad, 0),
+      `$${v.subtotal.toFixed(2)}`,
+      v.tipo_entrega === 'domicilio' ? `$${v.costoEnvio.toFixed(2)}` : 'GRATIS',
+      `$${v.total.toFixed(2)}`,
+    ])
+
+    ;(doc as any).autoTable({
+      startY: 35,
+      head: [['Fecha', 'Productos', 'Cantidad', 'Subtotal', 'Envío', 'Total']],
+      body: rows,
+      theme: 'grid',
+      headStyles: { fillColor: [255, 152, 0], textColor: [255, 255, 255] },
+    })
+
+    doc.save('ventas-animalia.pdf')
   }
 
   if (!profile || profile.role !== 'superadmin') return <p className="p-4">Acceso denegado.</p>
@@ -61,7 +92,10 @@ export default function VentasPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">📊 Registro de Ventas</h1>
-        <button onClick={exportarPDF} className="bg-red-600 text-white px-4 py-2 rounded-xl hover:bg-red-700 text-sm">
+        <button
+          onClick={exportarPDF}
+          className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-xl text-sm font-semibold transition"
+        >
           📄 Exportar PDF
         </button>
       </div>
@@ -90,12 +124,14 @@ export default function VentasPage() {
               <th className="p-3 text-left">Fecha</th>
               <th className="p-3 text-left">Productos</th>
               <th className="p-3 text-left">Cantidad</th>
-              <th className="p-3 text-left">Importe</th>
+              <th className="p-3 text-left">Subtotal</th>
+              <th className="p-3 text-left">Envío</th>
+              <th className="p-3 text-left">Total</th>
             </tr>
           </thead>
           <tbody>
             {ventasFiltradas.length === 0 ? (
-              <tr><td colSpan={4} className="p-4 text-center text-gray-500">No hay ventas registradas.</td></tr>
+              <tr><td colSpan={6} className="p-4 text-center text-gray-500">No hay ventas registradas.</td></tr>
             ) : (
               ventasFiltradas.map((v) => (
                 <tr key={v.id} className="border-t hover:bg-gray-50">
@@ -106,6 +142,8 @@ export default function VentasPage() {
                     ))}
                   </td>
                   <td className="p-3">{v.items.reduce((sum, item) => sum + item.cantidad, 0)}</td>
+                  <td className="p-3">${v.subtotal.toFixed(2)}</td>
+                  <td className="p-3">{v.tipo_entrega === 'domicilio' ? `$${v.costoEnvio.toFixed(2)}` : 'GRATIS'}</td>
                   <td className="p-3 font-medium">${v.total.toFixed(2)}</td>
                 </tr>
               ))
