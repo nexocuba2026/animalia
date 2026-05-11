@@ -14,6 +14,7 @@ import InventarioPage from './pages/dashboard/inventario/InventarioPage'
 import EquipoPage from './pages/dashboard/equipo/EquipoPage'
 import RegistroConsultaPage from './pages/dashboard/consultas/RegistroConsultaPage'
 import RegistroTratamientoPage from './pages/dashboard/tratamientos/RegistroTratamientoPage'
+import CategoriasPage from './pages/dashboard/categorias/CategoriasPage'
 
 // Páginas con carga diferida (se descargan solo al visitarlas)
 const PacientesPage = lazy(() => import('./pages/dashboard/PacientesPage'))
@@ -70,6 +71,7 @@ function App() {
 <Route path="equipo" element={<EquipoPage />} />
 <Route path="consulta" element={<RegistroConsultaPage />} />
 <Route path="tratamiento" element={<RegistroTratamientoPage />} />
+<Route path="categorias" element={<CategoriasPage />} />
             </Route>
           </Routes>
         </Suspense>

@@ -9,7 +9,7 @@ type Tratamiento = {
   id: string
   fecha: string
   descripcion: string
-  mascota: { id: string; nombre: string; numero_historia_clinica: string }
+  mascota: { id: string; nombre: string; numero_historia_clinica: string } | null
   veterinario: { id: string; nombre_completo: string } | null
 }
 
@@ -18,17 +18,18 @@ export default function RegistroTratamientoPage() {
   const [tratamientos, setTratamientos] = useState<Tratamiento[]>([])
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [pacientes, setPacientes] = useState<Paciente[]>([])
-  const [tecnicos, setTecnicos] = useState<EquipoMember[]>([])
+  const [equipo, setEquipo] = useState<EquipoMember[]>([])            // todos los miembros
   const [medicamentos, setMedicamentos] = useState<Medicamento[]>([])
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [form, setForm] = useState({
     mascota_id: '',
     fecha: new Date().toISOString().slice(0,10),
     descripcion: '',
-    tecnico_id: '',
-    medicamento: '',
+    responsable_id: '',             // ID del miembro del equipo seleccionado
+    responsable_nombre: '',         // nombre correspondiente
+    medicamento_id: '',
+    medicamento_nombre: '',
     cantidad: '',
-    medicamento_id: '', // para referencia
   })
   const [mensaje, setMensaje] = useState('')
 
@@ -36,7 +37,7 @@ export default function RegistroTratamientoPage() {
     if (!profile || !['veterinario','superadmin','tecnico','administrador'].includes(profile.role)) return
     fetchTratamientos()
     fetchPacientes()
-    fetchTecnicos()
+    fetchEquipo()
     fetchMedicamentos()
   }, [profile])
 
@@ -54,9 +55,9 @@ export default function RegistroTratamientoPage() {
     if (data) setPacientes(data)
   }
 
-  const fetchTecnicos = async () => {
+  const fetchEquipo = async () => {
     const { data } = await supabase.from('equipo').select('id, nombre_completo, cargo')
-    if (data) setTecnicos(data.filter(m => m.cargo.toLowerCase().includes('tecnico')))
+    if (data) setEquipo(data)  // todos los miembros
   }
 
   const fetchMedicamentos = async () => {
@@ -69,21 +70,30 @@ export default function RegistroTratamientoPage() {
 
   const abrirNueva = () => {
     setEditandoId(null)
-    setForm({ mascota_id: '', fecha: new Date().toISOString().slice(0,10), descripcion: '', tecnico_id: '', medicamento: '', cantidad: '', medicamento_id: '' })
+    setForm({
+      mascota_id: '',
+      fecha: new Date().toISOString().slice(0,10),
+      descripcion: '',
+      responsable_id: '',
+      responsable_nombre: '',
+      medicamento_id: '',
+      medicamento_nombre: '',
+      cantidad: '',
+    })
     setMostrarFormulario(true)
   }
 
   const editarTratamiento = (t: Tratamiento) => {
-    // Como no tenemos los campos de medicamento en el historial, no precargamos medicamento.
     setEditandoId(t.id)
     setForm({
       mascota_id: t.mascota?.id || '',
       fecha: t.fecha,
       descripcion: t.descripcion,
-      tecnico_id: t.veterinario?.id || '',
-      medicamento: '',
-      cantidad: '',
+      responsable_id: '',
+      responsable_nombre: '',
       medicamento_id: '',
+      medicamento_nombre: '',
+      cantidad: '',
     })
     setMostrarFormulario(true)
   }
@@ -98,17 +108,20 @@ export default function RegistroTratamientoPage() {
     e.preventDefault()
     setMensaje('')
 
-    // Construir descripción combinada
+    // Construir descripción combinada con medicamento, cantidad y responsable
     let descFinal = form.descripcion
-    if (form.medicamento) {
-      descFinal = `Medicamento: ${form.medicamento}${form.cantidad ? ', Cantidad: ' + form.cantidad : ''}. ${descFinal}`
+    if (form.medicamento_nombre) {
+      descFinal = `Medicamento: ${form.medicamento_nombre}` + (form.cantidad ? `, Cantidad: ${form.cantidad}` : '') + `. ` + descFinal
+    }
+    if (form.responsable_nombre) {
+      descFinal = `Responsable: ${form.responsable_nombre}. ` + descFinal
     }
 
     const datos = {
       mascota_id: form.mascota_id,
       fecha: form.fecha,
       descripcion: descFinal,
-      veterinario_id: form.tecnico_id || profile!.id,
+      veterinario_id: profile!.id,   // siempre el usuario logueado
       tipo: 'tratamiento',
     }
 
@@ -131,15 +144,18 @@ export default function RegistroTratamientoPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">💉 Tratamientos</h1>
-        <button onClick={abrirNueva} className="bg-orange-500 text-white px-4 py-2 rounded-xl hover:bg-orange-600">+ Nuevo Tratamiento</button>
+        <button onClick={abrirNueva} className="bg-orange-500 text-white px-4 py-2 rounded-xl hover:bg-orange-600">
+          + Nuevo Tratamiento
+        </button>
       </div>
 
       {mensaje && <div className="bg-green-100 text-green-800 p-3 rounded-xl">{mensaje}</div>}
 
+      {/* Lista de tratamientos */}
       {tratamientos.map(t => (
         <details key={t.id} className="bg-white border border-gray-200 rounded-2xl p-4 group">
           <summary className="cursor-pointer font-semibold">
-            {t.mascota?.nombre} — {new Date(t.fecha).toLocaleDateString()}
+            {t.mascota?.nombre || 'Paciente desconocido'} — {new Date(t.fecha).toLocaleDateString()}
             <span className="text-gray-500 ml-2">({t.veterinario?.nombre_completo || 'Sin responsable'})</span>
           </summary>
           <div className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">{t.descripcion}</div>
@@ -151,10 +167,12 @@ export default function RegistroTratamientoPage() {
       ))}
       {tratamientos.length === 0 && <p className="text-gray-500">No hay tratamientos registrados.</p>}
 
+      {/* Modal formulario */}
       {mostrarFormulario && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold">{editandoId ? 'Editar Tratamiento' : 'Nuevo Tratamiento'}</h2>
+
             <div>
               <label className="text-sm font-medium">Paciente</label>
               <select value={form.mascota_id} onChange={e => setForm({...form, mascota_id: e.target.value})} className="w-full border rounded-xl px-4 py-2" required>
@@ -162,36 +180,62 @@ export default function RegistroTratamientoPage() {
                 {pacientes.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.numero_historia_clinica})</option>)}
               </select>
             </div>
+
             <div>
               <label className="text-sm font-medium">Fecha</label>
               <input type="date" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} className="w-full border rounded-xl px-4 py-2" />
             </div>
+
             <div>
               <label className="text-sm font-medium">Medicamento</label>
-              <select value={form.medicamento_id} onChange={e => {
-                const id = e.target.value
-                const med = medicamentos.find(m => m.id === id)
-                setForm({...form, medicamento_id: id, medicamento: med?.nombre || ''})
-              }} className="w-full border rounded-xl px-4 py-2">
+              <select
+                value={form.medicamento_id}
+                onChange={e => {
+                  const id = e.target.value
+                  const med = medicamentos.find(m => m.id === id)
+                  setForm({
+                    ...form,
+                    medicamento_id: id,
+                    medicamento_nombre: med ? med.nombre : '',
+                  })
+                }}
+                className="w-full border rounded-xl px-4 py-2"
+              >
                 <option value="">-- Seleccionar medicamento --</option>
                 {medicamentos.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
               </select>
             </div>
+
             <div>
               <label className="text-sm font-medium">Cantidad</label>
               <input type="text" value={form.cantidad} onChange={e => setForm({...form, cantidad: e.target.value})} className="w-full border rounded-xl px-4 py-2" placeholder="Ej: 2 tabletas" />
             </div>
+
             <div>
               <label className="text-sm font-medium">Descripción adicional</label>
               <textarea value={form.descripcion} onChange={e => setForm({...form, descripcion: e.target.value})} className="w-full border rounded-xl px-4 py-2" rows={3} placeholder="Instrucciones, observaciones..." />
             </div>
+
             <div>
-              <label className="text-sm font-medium">Técnico responsable</label>
-              <select value={form.tecnico_id} onChange={e => setForm({...form, tecnico_id: e.target.value})} className="w-full border rounded-xl px-4 py-2">
-                <option value="">-- Seleccionar --</option>
-                {tecnicos.map(t => <option key={t.id} value={t.id}>{t.nombre_completo}</option>)}
+              <label className="text-sm font-medium">Responsable (miembro del equipo)</label>
+              <select
+                value={form.responsable_id}
+                onChange={e => {
+                  const id = e.target.value
+                  const resp = equipo.find(m => m.id === id)
+                  setForm({
+                    ...form,
+                    responsable_id: id,
+                    responsable_nombre: resp ? resp.nombre_completo : '',
+                  })
+                }}
+                className="w-full border rounded-xl px-4 py-2"
+              >
+                <option value="">-- Seleccionar responsable --</option>
+                {equipo.map(m => <option key={m.id} value={m.id}>{m.nombre_completo} ({m.cargo})</option>)}
               </select>
             </div>
+
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => setMostrarFormulario(false)} className="px-4 py-2 bg-gray-200 rounded-xl">Cancelar</button>
               <button type="submit" className="px-4 py-2 bg-orange-500 text-white rounded-xl">Guardar</button>
