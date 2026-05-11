@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './lib/auth-context'
 import { lazy, Suspense } from 'react'
 
+
 // Páginas estáticas (se cargan siempre, pero son ligeras)
 import HomePage from './components/HomePage'
 import LoginPage from './pages/LoginPage'
@@ -9,6 +10,10 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardLayout from './layouts/DashboardLayout'
 import DashboardHomePage from './pages/dashboard/DashboardHomePage'
 import WhatsAppButton from './components/WhatsAppButton'
+import InventarioPage from './pages/dashboard/inventario/InventarioPage'
+import EquipoPage from './pages/dashboard/equipo/EquipoPage'
+import RegistroConsultaPage from './pages/dashboard/consultas/RegistroConsultaPage'
+import RegistroTratamientoPage from './pages/dashboard/tratamientos/RegistroTratamientoPage'
 
 // Páginas con carga diferida (se descargan solo al visitarlas)
 const PacientesPage = lazy(() => import('./pages/dashboard/PacientesPage'))
@@ -61,6 +66,10 @@ function App() {
               <Route path="usuarios" element={<UsuariosPage />} />
               <Route path="herramientas" element={<HerramientasPage />} />
               <Route path="agenda" element={<AgendaPage />} />
+<Route path="inventario" element={<InventarioPage />} />
+<Route path="equipo" element={<EquipoPage />} />
+<Route path="consulta" element={<RegistroConsultaPage />} />
+<Route path="tratamiento" element={<RegistroTratamientoPage />} />
             </Route>
           </Routes>
         </Suspense>

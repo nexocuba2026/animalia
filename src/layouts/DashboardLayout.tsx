@@ -32,6 +32,13 @@ export default function DashboardLayout() {
     { label: 'Registro de Ventas', path: '/dashboard/ventas', roles: ['administrador', 'superadmin'] },
     { label: 'Usuarios', path: '/dashboard/usuarios', roles: ['superadmin'] },
     { label: 'Herramientas', path: '/dashboard/herramientas', roles: ['superadmin'] },
+    { label: 'Herramientas', path: '/dashboard/herramientas', roles: ['superadmin'] },
+    // AQUÍ PEGAS LAS NUEVAS LÍNEAS:
+    { label: 'Inventario', path: '/dashboard/inventario', roles: ['superadmin', 'recepcionista'] },
+    { label: 'Equipo', path: '/dashboard/equipo', roles: ['superadmin', 'administrador'] },
+    { label: 'Registro de Consulta', path: '/dashboard/consulta', roles: ['veterinario', 'superadmin', 'administrador'] },
+    { label: 'Registro de Tratamiento', path: '/dashboard/tratamiento', roles: ['tecnico', 'superadmin', 'administrador'] },
+  ];
   ]
 
   const filteredMenu = menuItems.filter(item => item.roles.includes(profile.role))
