@@ -98,19 +98,37 @@ export default function CitasPage() {
                     {cita.estado.toUpperCase()}
                   </span>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button onClick={() => actualizarEstado(cita.id, 'realizada')} className="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1 rounded-lg text-sm font-medium">✅ Realizada</button>
-                  <button onClick={() => actualizarEstado(cita.id, 'no_realizada')} className="bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded-lg text-sm font-medium">❌ No realizada</button>
-                  {reagendandoId === cita.id ? (
-                    <div className="flex items-center gap-2">
-                      <input type="datetime-local" value={nuevaFecha} onChange={(e) => setNuevaFecha(e.target.value)} className="border rounded px-2 py-1 text-sm" />
-                      <button onClick={() => confirmarReagendar(cita.id)} className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-lg text-sm font-medium">Confirmar</button>
-                      <button onClick={() => setReagendandoId(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded-lg text-sm">Cancelar</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setReagendandoId(cita.id)} className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-lg text-sm font-medium">🔁 Re-agendar</button>
-                  )}
-                </div>
+
+                {/* Botones de acción (solo para administradores) */}
+                {profile?.role !== 'cliente' && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button onClick={() => actualizarEstado(cita.id, 'realizada')} className="bg-green-100 hover:bg-green-200 text-green-800 px-3 py-1 rounded-lg text-sm font-medium">✅ Realizada</button>
+                    <button onClick={() => actualizarEstado(cita.id, 'no_realizada')} className="bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded-lg text-sm font-medium">❌ No realizada</button>
+                    {reagendandoId === cita.id ? (
+                      <div className="flex items-center gap-2">
+                        <input type="datetime-local" value={nuevaFecha} onChange={(e) => setNuevaFecha(e.target.value)} className="border rounded px-2 py-1 text-sm" />
+                        <button onClick={() => confirmarReagendar(cita.id)} disabled={!nuevaFecha} className={`px-3 py-1 rounded-lg text-sm font-medium ${!nuevaFecha ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-100 hover:bg-blue-200 text-blue-800'}`}>Confirmar</button>
+                        <button onClick={() => setReagendandoId(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded-lg text-sm">Cancelar</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setReagendandoId(cita.id)} className="bg-blue-100 hover:bg-blue-200 text-blue-800 px-3 py-1 rounded-lg text-sm font-medium">🔁 Re-agendar</button>
+                    )}
+                  </div>
+                )}
+
+                {/* Botón de WhatsApp para el cliente */}
+                {profile?.role === 'cliente' && cita.estado !== 'cancelada' && (
+                  <div className="mt-3">
+                    <a
+                      href={`https://wa.me/5355415537?text=Hola%2C%20tengo%20una%20consulta%20sobre%20mi%20cita%20${cita.numero_cita || ''}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white text-xs px-3 py-2 rounded-lg font-medium transition"
+                    >
+                      💬 Consultar por WhatsApp
+                    </a>
+                  </div>
+                )}
               </div>
             ))}
           </div>
