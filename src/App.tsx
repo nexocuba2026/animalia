@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardLayout from './layouts/DashboardLayout'
 import DashboardHomePage from './pages/dashboard/DashboardHomePage'
+import WhatsAppButton from './components/WhatsAppButton'
 
 // Páginas con carga diferida (se descargan solo al visitarlas)
 const PacientesPage = lazy(() => import('./pages/dashboard/PacientesPage'))
@@ -34,6 +35,7 @@ const Loading = () => <div className="flex justify-center items-center h-64">Car
 function App() {
   return (
     <AuthProvider>
+<WhatsAppButton />
       <HashRouter>
         <Suspense fallback={<Loading />}>
           <Routes>
