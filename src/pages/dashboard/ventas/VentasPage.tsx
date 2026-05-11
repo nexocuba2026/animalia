@@ -7,6 +7,7 @@ import 'jspdf-autotable'
 type Venta = {
   id: string
   fecha_pedido: string
+  tipo_entrega: string          // <-- añadido
   items: { cantidad: number; precio_unitario: number; producto: { nombre: string } }[]
   subtotal: number
   costoEnvio: number
@@ -29,7 +30,7 @@ export default function VentasPage() {
   const fetchVentas = async () => {
     const { data } = await supabase
       .from('pedidos')
-      .select('id, fecha_pedido, tipo_entrega, items:pedido_items(cantidad, precio_unitario, producto:productos(nombre))')
+      .select('id, fecha_pedido, tipo_entrega, items:pedido_items(cantidad, precio_unitario, producto:productos(nombre))')  // <-- tipo_entrega incluido
       .eq('estado', 'entregado')
       .order('fecha_pedido', { ascending: false })
 
