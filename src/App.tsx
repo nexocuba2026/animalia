@@ -2,14 +2,14 @@ import { HashRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './lib/auth-context'
 import { lazy, Suspense } from 'react'
 
-// Carga estática para las páginas principales (necesarias al instante)
+// Páginas estáticas (se cargan siempre, pero son ligeras)
 import HomePage from './components/HomePage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardLayout from './layouts/DashboardLayout'
 import DashboardHomePage from './pages/dashboard/DashboardHomePage'
 
-// Carga diferida (lazy) para el resto de páginas
+// Páginas con carga diferida (se descargan solo al visitarlas)
 const PacientesPage = lazy(() => import('./pages/dashboard/PacientesPage'))
 const NuevoPacientePage = lazy(() => import('./pages/dashboard/pacientes/NuevoPacientePage'))
 const HistorialPage = lazy(() => import('./pages/dashboard/historial/HistorialPage'))
@@ -28,7 +28,7 @@ const UsuariosPage = lazy(() => import('./pages/dashboard/usuarios/UsuariosPage'
 const HerramientasPage = lazy(() => import('./pages/dashboard/herramientas/HerramientasPage'))
 const AgendaPage = lazy(() => import('./pages/dashboard/agenda/AgendaPage'))
 
-// Componente simple para mostrar mientras se carga una página
+// Componente que se muestra mientras se carga una página diferida
 const Loading = () => <div className="flex justify-center items-center h-64">Cargando página...</div>
 
 function App() {
