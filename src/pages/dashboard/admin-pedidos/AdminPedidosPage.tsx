@@ -52,8 +52,7 @@ export default function AdminPedidosPage() {
       setMensaje('Error: ' + error.message)
     } else {
       setMensaje(`Pedido actualizado a "${nuevoEstado}".`)
-      fetchPedidos() // recargar la lista
-      // La notificación al cliente ocurre por la suscripción en tiempo real en su página "Mis Pedidos"
+      fetchPedidos()
     }
     setTimeout(() => setMensaje(''), 3000)
   }
@@ -80,11 +79,13 @@ export default function AdminPedidosPage() {
         const puedeEnviar = estado === 'recibido'
         const puedeEntregar = estado === 'enviado_entrega'
 
-        // Calcular importe total
-        const total = pedido.items.reduce(
+        // Calcular importes
+        const subtotal = pedido.items.reduce(
           (sum, item) => sum + item.cantidad * item.precio_unitario,
           0
         )
+        const costoEnvio = pedido.tipo_entrega === 'domicilio' ? 5.0 : 0
+        const total = subtotal + costoEnvio
 
         return (
           <div
@@ -113,10 +114,7 @@ export default function AdminPedidosPage() {
                     )}
                   </p>
                 </div>
-                {/* Estado actual solo como referencia pequeña */}
-                <span className="text-xs text-gray-400 capitalize">
-                  {estado.replace('_', ' ')}
-                </span>
+                {/* Sin etiqueta de estado en el borde */}
               </div>
 
               {/* Desglose de artículos */}
@@ -143,8 +141,17 @@ export default function AdminPedidosPage() {
                     ))}
                   </tbody>
                 </table>
-                <div className="flex justify-end mt-2 font-bold text-sm">
-                  Importe total: ${total.toFixed(2)}
+
+                {/* Costo de envío y total */}
+                <div className="text-right text-sm mt-2 space-y-1">
+                  {pedido.tipo_entrega === 'domicilio' && (
+                    <p className="text-gray-500">
+                      Envío: +${costoEnvio.toFixed(2)}
+                    </p>
+                  )}
+                  <p className="font-bold text-base">
+                    Importe total: ${total.toFixed(2)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -194,12 +201,7 @@ export default function AdminPedidosPage() {
                         e.stopPropagation()
                         actualizarEstado(pedido.id, 'recibido')
                       }}
-                      disabled={!puedeRecibir}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium ${
-                        puedeRecibir
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
+                      className="bg-green-600 text-white px-4 py-2 rounded-xl hover:bg-green-700 text-sm font-medium"
                     >
                       ✅ Recibido
                     </button>
@@ -210,12 +212,7 @@ export default function AdminPedidosPage() {
                         e.stopPropagation()
                         actualizarEstado(pedido.id, 'enviado_entrega')
                       }}
-                      disabled={!puedeEnviar}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium ${
-                        puedeEnviar
-                          ? 'bg-blue-600 text-white hover:bg-blue-700'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 text-sm font-medium"
                     >
                       🚀 Enviado
                     </button>
@@ -226,12 +223,7 @@ export default function AdminPedidosPage() {
                         e.stopPropagation()
                         actualizarEstado(pedido.id, 'entregado')
                       }}
-                      disabled={!puedeEntregar}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium ${
-                        puedeEntregar
-                          ? 'bg-purple-600 text-white hover:bg-purple-700'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
+                      className="bg-purple-600 text-white px-4 py-2 rounded-xl hover:bg-purple-700 text-sm font-medium"
                     >
                       📬 Entregado
                     </button>
