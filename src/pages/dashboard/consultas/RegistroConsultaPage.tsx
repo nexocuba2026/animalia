@@ -4,31 +4,45 @@ import { useAuth } from '../../../lib/auth-context'
 
 type Paciente = { id: string; nombre: string; numero_historia_clinica: string }
 type EquipoMember = { id: string; nombre_completo: string; cargo: string }
+type Consulta = {
+  id: string
+  fecha: string
+  descripcion: string
+  mascota: { id: string; nombre: string; numero_historia_clinica: string }
+  veterinario: { id: string; nombre_completo: string } | null
+}
 
 export default function RegistroConsultaPage() {
   const { profile } = useAuth()
+  const [consultas, setConsultas] = useState<Consulta[]>([])
+  const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [pacientes, setPacientes] = useState<Paciente[]>([])
   const [veterinarios, setVeterinarios] = useState<EquipoMember[]>([])
-  const [selectedPaciente, setSelectedPaciente] = useState<Paciente | null>(null)
-  const [nuevoPaciente, setNuevoPaciente] = useState(false)
+  const [editandoId, setEditandoId] = useState<string | null>(null)
   const [form, setForm] = useState({
-    propietario_nombre: '',
-    propietario_cedula: '',
-    propietario_telefono: '',
-    nombre_mascota: '',
-    especie: 'perro',
-    raza: '',
+    mascota_id: '',
     fecha: new Date().toISOString().slice(0,10),
     descripcion: '',
     veterinario_id: '',
   })
   const [mensaje, setMensaje] = useState('')
 
+  // Cargar consultas
   useEffect(() => {
     if (!profile || !['veterinario','superadmin','tecnico','administrador'].includes(profile.role)) return
+    fetchConsultas()
     fetchPacientes()
     fetchVeterinarios()
   }, [profile])
+
+  const fetchConsultas = async () => {
+    const { data } = await supabase
+      .from('historias_clinicas')
+      .select('id, fecha, descripcion, mascota:mascotas(id, nombre, numero_historia_clinica), veterinario:profiles!veterinario_id(id, nombre_completo)')
+      .eq('tipo', 'consulta')
+      .order('fecha', { ascending: false })
+    if (data) setConsultas(data as unknown as Consulta[])
+  }
 
   const fetchPacientes = async () => {
     const { data } = await supabase.from('mascotas').select('id, nombre, numero_historia_clinica')
@@ -40,128 +54,116 @@ export default function RegistroConsultaPage() {
     if (data) setVeterinarios(data.filter(m => m.cargo.toLowerCase().includes('veterinario')))
   }
 
-  const handlePacienteChange = async (pacienteId: string) => {
-    if (!pacienteId) {
-      setSelectedPaciente(null)
-      setNuevoPaciente(true)
-      return
-    }
-    const { data } = await supabase.from('mascotas').select('*, propietario:propietario_id(nombre_completo, cedula, telefono)').eq('id', pacienteId).single()
-    if (data) {
-      setSelectedPaciente(data)
-      setNuevoPaciente(false)
-      setForm(prev => ({
-        ...prev,
-        propietario_nombre: data.propietario?.nombre_completo || '',
-        propietario_cedula: data.propietario?.cedula || '',
-        propietario_telefono: data.propietario?.telefono || '',
-        nombre_mascota: data.nombre,
-        especie: data.especie,
-        raza: data.raza || '',
-      }))
-    }
+  // Abrir formulario para nueva consulta
+  const abrirNueva = () => {
+    setEditandoId(null)
+    setForm({ mascota_id: '', fecha: new Date().toISOString().slice(0,10), descripcion: '', veterinario_id: '' })
+    setMostrarFormulario(true)
+  }
+
+  // Cargar consulta en formulario para editar
+  const editarConsulta = (c: Consulta) => {
+    setEditandoId(c.id)
+    setForm({
+      mascota_id: c.mascota?.id || '',
+      fecha: c.fecha,
+      descripcion: c.descripcion,
+      veterinario_id: c.veterinario?.id || '',
+    })
+    setMostrarFormulario(true)
+  }
+
+  const eliminarConsulta = async (id: string) => {
+    if (!confirm('¿Eliminar esta consulta?')) return
+    await supabase.from('historias_clinicas').delete().eq('id', id)
+    fetchConsultas()
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setMensaje('')
+    const datos = {
+      mascota_id: form.mascota_id,
+      fecha: form.fecha,
+      descripcion: form.descripcion,
+      veterinario_id: form.veterinario_id || profile!.id,
+      tipo: 'consulta',
+    }
 
-    let propietarioId = null
-    if (!selectedPaciente) {
-      // Buscar o crear propietario
-      const { data: existente } = await supabase.from('profiles').select('id').eq('cedula', form.propietario_cedula).single()
-      if (existente) {
-        propietarioId = existente.id
-      } else {
-        const { data: nuevo } = await supabase.from('profiles').insert({
-          role: 'cliente',
-          nombre_completo: form.propietario_nombre,
-          cedula: form.propietario_cedula,
-          telefono: form.propietario_telefono,
-        }).select('id').single()
-        propietarioId = nuevo?.id
-      }
-      if (!propietarioId) { setMensaje('Error al crear propietario'); return }
+    const { error } = editandoId
+      ? await supabase.from('historias_clinicas').update(datos).eq('id', editandoId)
+      : await supabase.from('historias_clinicas').insert(datos)
 
-      const { data: mascota } = await supabase.from('mascotas').insert({
-        propietario_id: propietarioId,
-        nombre: form.nombre_mascota,
-        especie: form.especie,
-        raza: form.raza || null,
-        estado: 'activa',
-      }).select('id').single()
-      if (!mascota) { setMensaje('Error al crear mascota'); return }
-
-      // Crear entrada en historia clínica
-      await supabase.from('historias_clinicas').insert({
-        mascota_id: mascota.id,
-        veterinario_id: form.veterinario_id || profile!.id,
-        tipo: 'consulta',
-        descripcion: form.descripcion,
-        fecha: form.fecha,
-      })
-      setMensaje('✅ Consulta registrada y mascota creada.')
-    } else {
-      // Solo añadir historial
-      await supabase.from('historias_clinicas').insert({
-        mascota_id: selectedPaciente.id,
-        veterinario_id: form.veterinario_id || profile!.id,
-        tipo: 'consulta',
-        descripcion: form.descripcion,
-        fecha: form.fecha,
-      })
-      setMensaje('✅ Consulta agregada al historial.')
+    if (error) setMensaje('Error: ' + error.message)
+    else {
+      setMensaje('✅ Consulta guardada.')
+      setMostrarFormulario(false)
+      fetchConsultas()
     }
   }
 
+  if (!profile || !['veterinario','superadmin','tecnico','administrador'].includes(profile.role))
+    return <p className="p-4">Acceso denegado.</p>
+
   return (
-    <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">🩺 Registro de Consulta</h1>
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 space-y-4">
-        <div>
-          <label className="text-sm font-medium">Paciente</label>
-          <select
-            onChange={(e) => handlePacienteChange(e.target.value)}
-            className="w-full border rounded-xl px-4 py-2"
-            defaultValue=""
-          >
-            <option value="">-- Seleccionar paciente existente --</option>
-            {pacientes.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.numero_historia_clinica})</option>)}
-            <option value="__new__">+ Nuevo paciente</option>
-          </select>
-        </div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">🩺 Consultas</h1>
+        <button onClick={abrirNueva} className="bg-orange-500 text-white px-4 py-2 rounded-xl hover:bg-orange-600">+ Nueva Consulta</button>
+      </div>
 
-        {nuevoPaciente && (
-          <div className="grid grid-cols-2 gap-4 p-4 border rounded-xl bg-gray-50">
-            <input type="text" placeholder="Nombre del propietario" value={form.propietario_nombre} onChange={e => setForm({...form, propietario_nombre: e.target.value})} className="border rounded-xl px-4 py-2" required />
-            <input type="text" placeholder="Cédula" value={form.propietario_cedula} onChange={e => setForm({...form, propietario_cedula: e.target.value})} className="border rounded-xl px-4 py-2" />
-            <input type="text" placeholder="Teléfono" value={form.propietario_telefono} onChange={e => setForm({...form, propietario_telefono: e.target.value})} className="border rounded-xl px-4 py-2" />
-            <input type="text" placeholder="Nombre de la mascota" value={form.nombre_mascota} onChange={e => setForm({...form, nombre_mascota: e.target.value})} className="border rounded-xl px-4 py-2" required />
-            <select value={form.especie} onChange={e => setForm({...form, especie: e.target.value})} className="border rounded-xl px-4 py-2">
-              <option value="perro">Perro</option><option value="gato">Gato</option><option value="ave">Ave</option><option value="otro">Otro</option>
-            </select>
-            <input type="text" placeholder="Raza" value={form.raza} onChange={e => setForm({...form, raza: e.target.value})} className="border rounded-xl px-4 py-2" />
+      {mensaje && <div className="bg-green-100 text-green-800 p-3 rounded-xl">{mensaje}</div>}
+
+      {/* Lista de consultas como tarjetas */}
+      {consultas.map(c => (
+        <details key={c.id} className="bg-white border border-gray-200 rounded-2xl p-4 group">
+          <summary className="cursor-pointer font-semibold">
+            {c.mascota?.nombre} — {new Date(c.fecha).toLocaleDateString()}
+            <span className="text-gray-500 ml-2">({c.veterinario?.nombre_completo || 'Sin veterinario'})</span>
+          </summary>
+          <div className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">{c.descripcion}</div>
+          <div className="mt-3 flex gap-2">
+            <button onClick={() => editarConsulta(c)} className="text-orange-600 hover:underline text-xs">Editar</button>
+            <button onClick={() => eliminarConsulta(c.id)} className="text-red-600 hover:underline text-xs">Eliminar</button>
           </div>
-        )}
+        </details>
+      ))}
+      {consultas.length === 0 && <p className="text-gray-500">No hay consultas registradas.</p>}
 
-        <div>
-          <label className="text-sm font-medium">Fecha</label>
-          <input type="date" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} className="w-full border rounded-xl px-4 py-2" />
+      {/* Modal del formulario */}
+      {mostrarFormulario && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-bold">{editandoId ? 'Editar Consulta' : 'Nueva Consulta'}</h2>
+            <div>
+              <label className="text-sm font-medium">Paciente</label>
+              <select value={form.mascota_id} onChange={e => setForm({...form, mascota_id: e.target.value})} className="w-full border rounded-xl px-4 py-2" required>
+                <option value="">-- Seleccionar --</option>
+                {pacientes.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.numero_historia_clinica})</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Fecha</label>
+              <input type="date" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} className="w-full border rounded-xl px-4 py-2" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Descripción</label>
+              <textarea value={form.descripcion} onChange={e => setForm({...form, descripcion: e.target.value})} className="w-full border rounded-xl px-4 py-2" rows={4} required />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Veterinario responsable</label>
+              <select value={form.veterinario_id} onChange={e => setForm({...form, veterinario_id: e.target.value})} className="w-full border rounded-xl px-4 py-2">
+                <option value="">-- Seleccionar --</option>
+                {veterinarios.map(v => <option key={v.id} value={v.id}>{v.nombre_completo}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setMostrarFormulario(false)} className="px-4 py-2 bg-gray-200 rounded-xl">Cancelar</button>
+              <button type="submit" className="px-4 py-2 bg-orange-500 text-white rounded-xl">Guardar</button>
+            </div>
+          </form>
         </div>
-        <div>
-          <label className="text-sm font-medium">Descripción de la consulta</label>
-          <textarea value={form.descripcion} onChange={e => setForm({...form, descripcion: e.target.value})} className="w-full border rounded-xl px-4 py-2" rows={4} required />
-        </div>
-        <div>
-          <label className="text-sm font-medium">Veterinario responsable</label>
-          <select value={form.veterinario_id} onChange={e => setForm({...form, veterinario_id: e.target.value})} className="w-full border rounded-xl px-4 py-2">
-            <option value="">-- Seleccionar veterinario --</option>
-            {veterinarios.map(v => <option key={v.id} value={v.id}>{v.nombre_completo}</option>)}
-          </select>
-        </div>
-        <button type="submit" className="w-full bg-orange-500 text-white py-3 rounded-xl font-semibold">Registrar Consulta</button>
-        {mensaje && <p className={`text-sm ${mensaje.startsWith('✅') ? 'text-green-600' : 'text-red-600'}`}>{mensaje}</p>}
-      </form>
+      )}
     </div>
   )
 }
