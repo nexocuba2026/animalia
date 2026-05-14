@@ -1,30 +1,43 @@
-const CACHE_NAME = 'animalia-v2'
+const CACHE_NAME = 'animalia-v3'
 
-self.addEventListener('install', (event) => {
+const PRECACHE_URLS = [
+  '/animalia/',
+  '/animalia/index.html',
+  '/logo.png',
+]
+
+self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([
-        '/animalia/',
-        '/animalia/index.html',
-        '/logo.png',
-      ])
+    caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_URLS))
+  )
+})
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return
+
+  event.respondWith(
+    caches.match(event.request).then(cachedResponse => {
+      const fetchPromise = fetch(event.request).then(networkResponse => {
+        if (
+          networkResponse.ok &&
+          (event.request.url.endsWith('.js') ||
+           event.request.url.endsWith('.css') ||
+           event.request.url.endsWith('.woff2'))
+        ) {
+          const clonedResponse = networkResponse.clone()
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clonedResponse))
+        }
+        return networkResponse
+      })
+      return cachedResponse || fetchPromise
     })
   )
 })
 
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      return cachedResponse || fetch(event.request).then((networkResponse) => {
-        // Cachear archivos JS y CSS automáticamente
-        if (networkResponse.ok && (event.request.url.endsWith('.js') || event.request.url.endsWith('.css'))) {
-          const clonedResponse = networkResponse.clone()
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, clonedResponse)
-          })
-        }
-        return networkResponse
-      })
-    })
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
+    )
   )
 })

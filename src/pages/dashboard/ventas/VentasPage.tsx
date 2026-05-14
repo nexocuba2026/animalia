@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../lib/auth-context'
-import jsPDF from 'jspdf'
-import 'jspdf-autotable'
 
 type Venta = {
   id: string
@@ -50,7 +48,6 @@ export default function VentasPage() {
     setLoading(false)
   }
 
-  // Filtro en pantalla
   const ventasFiltradas = ventas.filter((v) => {
     const desdeOk = !fechaDesde || new Date(v.fecha_pedido) >= new Date(fechaDesde)
     const hastaOk = !fechaHasta || new Date(v.fecha_pedido) <= new Date(fechaHasta + 'T23:59:59')
@@ -60,8 +57,11 @@ export default function VentasPage() {
     return desdeOk && hastaOk && productoOk
   })
 
-  // Exportar PDF
-  const exportarPDF = () => {
+  const exportarPDF = async () => {
+    // Carga diferida de las librerías (solo se descargan cuando se pulsa el botón)
+    const jsPDF = (await import('jspdf')).default
+    await import('jspdf-autotable')
+
     const doc = new jsPDF()
     doc.setFontSize(14)
     doc.text('REGISTRO DE VENTAS - ANIMALIA', 14, 20)
@@ -69,7 +69,7 @@ export default function VentasPage() {
     doc.text(`Fecha: ${new Date().toLocaleDateString('es-CU')}`, 14, 28)
 
     const rows = ventasFiltradas.map((v, index) => [
-      (index + 1).toString().padStart(3, '0'),  // Nº de pedido secuencial
+      (index + 1).toString().padStart(3, '0'),
       new Date(v.fecha_pedido).toLocaleDateString('es-CU'),
       v.items.map((item) => `${item.producto?.nombre} (x${item.cantidad})`).join(', '),
       v.items.reduce((sum, item) => sum + item.cantidad, 0),
@@ -86,7 +86,7 @@ export default function VentasPage() {
       headStyles: { fillColor: [255, 152, 0], textColor: [255, 255, 255] },
       bodyStyles: {},
       columnStyles: {
-        5: { textColor: [220, 38, 38] }, // Envío en rojo
+        5: { textColor: [220, 38, 38] },
       },
     })
 
@@ -108,7 +108,6 @@ export default function VentasPage() {
         </button>
       </div>
 
-      {/* Filtros */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white border border-gray-200 rounded-2xl p-4">
         <div>
           <label className="text-xs text-gray-500">Desde</label>
@@ -124,7 +123,6 @@ export default function VentasPage() {
         </div>
       </div>
 
-      {/* Tabla de ventas */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">

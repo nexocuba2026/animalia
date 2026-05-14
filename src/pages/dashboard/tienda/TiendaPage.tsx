@@ -131,10 +131,11 @@ export default function TiendaPage() {
         {productosFiltrados.map((prod) => (
           <div key={prod.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition">
             <img
-              src={prod.imagen_url || '/placeholder.png'}
-              alt={prod.nombre}
-              className="w-full h-40 object-contain bg-gray-100 p-4"
-            />
+  src={prod.imagen_url || '/placeholder.png'}
+  alt={prod.nombre}
+  loading="lazy"
+  className="w-full h-40 object-contain bg-gray-100 p-4"
+/>
             <div className="p-4">
               <span className="text-xs text-orange-600 uppercase font-semibold">{prod.categoria}</span>
               <h3 className="font-bold mt-1">{prod.nombre}</h3>
